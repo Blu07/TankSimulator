@@ -96,18 +96,4 @@ plt.plot(time, pressures)
 plt.title('Pressure over time')
 plt.show()
 
-def f(t):
-    return 30000 + 120 * t
-
-time_values = np.linspace(0, 100, 500)
-a_values = f(time_values)
-
-# Plot the graph
-plt.figure()
-plt.plot(time_values, a_values)
-plt.xlabel('Dager (t)')
-plt.ylabel('Befolkning')
-plt.title('Graf av befolkning f(t) = 30000 + 120t')
-plt.show()
-
             
