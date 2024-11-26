@@ -3,38 +3,47 @@ import numpy as np
 
 
 class Tank:
-    def __init__(self, h, r, rho, g, P1, outH, outR):
+    def __init__(self, h, r, rho, g, xPres, atmPres, outH, outR):
+        # Physical Properties 
         self.height = h
         self.r = r
         
+        self.extraPressure = xPres
+        
+        # Liqud State
         self.lqHeight = h
         self.volume = np.pi * r**2 * self.lqHeight
-        print(self.volume, self.lqHeight)
         
+        # Liquid Properties
         self.rho = rho
         self.g = g
-        self.P1 = P1
+        self.atmPres = atmPres
         
-        self.outH = outH
-        self.outR = outR
+        # Hole in and out
+        self.outH = outH    # Height above bottom of tank
+        self.outR = outR    # Hole radius
     
     
     def updateLqHeight(self):
+        """Updates the registered height of the liquid based on the current volume
+        """
         self.lqHeight = self.volume / (np.pi * self.r**2)
     
     def updateVolume(self):
+        """Updates the registered volume of the liquid based on the current volume
+        """
         self.volume = np.pi * self.r**2 * self.lqHeight
 
     
-
 
     def changeHeight(self, dH: int):
         self.height += dH
         
         
     def changeVolume(self, dV: int):
-        self.volume += dV
-        self.lqHeight = self.volume / (np.pi * self.r**2)
+        self.volume = max(self.volume + dV, 0) # Update Volume, is never under 0
+        self.lqHeight = self.volume/(np.pi * self.r**2)
+        
         print(f"volume is {self.volume}, set height to {self.lqHeight}")
    
    
@@ -44,30 +53,42 @@ class Tank:
     
     
     def getPressure(self, atHeight: int = 0):
-        return self.P1 + self.rho * self.g * (self.lqHeight - atHeight)
+        return self.atmPres + self.rho * self.g * (self.lqHeight - atHeight)
     
+
     
-    def simulate(self, T, res):
-        time, step = np.linspace(0, T, res, retstep=True)
-        pressures = []
+    def stepSimulation(self, step):
+        pressureAtHole = self.getPressure(self.outH)
         
-        for _ in time:
-            pressureAtHole = self.getPressure(self.outH)
+        presDiff = pressureAtHole - self.atmPres
+        
+        if presDiff >= 0:
             
             # Calculate flow rate (Q) in m^3/s
-            A = np.pi * self.outR**2
-            v = np.sqrt((2 * pressureAtHole) / self.rho)
-            Q = A*v
+            A = np.pi * self.outR**2 # Area cross of flow out
+                # k = np.sqrt(2*self.g)
+                # v = k * np.sqrt(self.height - self.outH) # Velocity out based on HEIGHT
+            v = np.sqrt((2 * presDiff) / self.rho) # Velocity out based on PRESSURE
+            Q = A*v 
 
-            # To get the flow per step, multiply by the step size
-            flowOut = Q * step
+            # To get the flow per step
+            flowThrough = -Q * step
+        
+            self.changeVolume(flowThrough)
+        
+
+    
+    
+    def createSimulationRecord(self, T, res):
+        
+        time, step = np.linspace(0, T, res, retstep=True)
+        xList = []
+        
+        for _ in time:
+            self.stepSimulation(step)
+            xList.append(self.volume) # Change which metric to record
             
-            if pressureAtHole >= 0:
-                self.changeVolume(-flowOut)
-            
-            pressures.append(self.getPressure())
-            
-        return time, pressures
+        return time, xList
             
         
 
@@ -77,7 +98,8 @@ rho = 1000
 g = 9.81
 P1 = 101.5e3
 
-    
+outH = 1
+outR = 0.01
     
 
 myTank = Tank(
@@ -85,15 +107,21 @@ myTank = Tank(
     r=r,
     rho=rho,
     g=g,
-    P1=P1,
-    outH=0.1,
-    outR=0.01
+    atmPres=P1,
+    xPres=0,
+    outH=outH,
+    outR=outR
 )
 
-time, pressures = myTank.simulate(20000, 300)
+simTime = 10 # sec
+simRes = 1000000
 
-plt.plot(time, pressures)
-plt.title('Pressure over time')
+time, x = myTank.createSimulationRecord(simTime*1000, simRes)
+
+plt.plot(time, x)
+plt.title('Volume over time')
+plt.ylim((0, 15))
 plt.show()
+
 
             
